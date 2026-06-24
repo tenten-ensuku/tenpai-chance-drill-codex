@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
-  <title>聴牌チャンス問題集 ver4</title>
+  <title>聴牌チャンス問題集 ver5</title>
   <style>
     :root {
       --bg: #061b17;
@@ -71,7 +71,7 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 8px;
       margin-bottom: 12px;
     }
@@ -82,6 +82,7 @@
       background: rgba(10, 48, 40, 0.72);
       color: var(--text);
       font-weight: 900;
+      font-size: 14px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
     }
     .tab.active {
@@ -245,6 +246,40 @@
       border-radius: 18px;
       background: rgba(0,0,0,0.20);
     }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 14px 0 8px;
+    }
+    .section-title {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+      font-weight: 900;
+      text-shadow: 0 3px 0 rgba(0,0,0,0.45);
+    }
+    .mode-card.big {
+      min-height: 114px;
+      padding: 18px 24px;
+      border-radius: 20px;
+      background: rgba(0,0,0,0.22);
+    }
+    .mode-card.big .mode-title {
+      font-size: 34px;
+      line-height: 1;
+    }
+    .mode-card.big .btn {
+      width: 92px;
+      min-height: 64px;
+      font-size: 20px;
+    }
+    .practice-btn {
+      background: linear-gradient(180deg, #b58a61 0%, #4c2a18 100%);
+      border-color: rgba(255,202,126,0.48);
+      color: var(--text);
+    }
     .mode-title {
       font-size: 22px;
       font-weight: 900;
@@ -293,21 +328,25 @@
     }
     .problem-row {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
       gap: 10px;
       align-items: center;
       background: rgba(0,0,0,0.20);
       border-radius: 16px;
       padding: 10px;
+      min-width: 0;
     }
     .mini-hand {
       display: flex;
       gap: 1px;
       align-items: center;
-      overflow: hidden;
+      width: 100%;
+      min-width: 0;
+      overflow: visible;
     }
     .mini-hand img {
-      width: min(7.2vw, 29px);
+      width: min(5vw, 22px);
+      min-width: 16px;
       aspect-ratio: 66 / 90;
       object-fit: contain;
       display: block;
@@ -316,13 +355,20 @@
       color: var(--gold);
       font-weight: 900;
       white-space: nowrap;
+      justify-self: end;
     }
     .muted { color: var(--muted); }
 
     @media (max-width: 360px) {
       .app { padding-left: 10px; padding-right: 10px; }
       h1 { font-size: 24px; }
+      .tab { font-size: 12px; min-height: 38px; }
+      .tabs { gap: 5px; }
       :root { --tile-w: clamp(30px, 6.4vw, 36px); }
+      .mode-card.big { padding: 15px 18px; }
+      .mode-card.big .mode-title { font-size: 30px; }
+      .mode-card.big .btn { width: 82px; }
+      .mini-hand img { width: 16px; }
     }
   </style>
 </head>
@@ -330,7 +376,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 4;
+    const APP_VERSION = 5;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -407,7 +453,11 @@
       elapsed: 0,
       questionStartedAt: 0,
       timerId: null,
-      history: loadJson("tenpaiChanceHistory", [])
+      mode: "challenge",
+      gameSize: 5,
+      wrongResults: [],
+      history: loadJson("tenpaiChanceHistory", []),
+      review: loadJson("tenpaiChanceReview", [])
     };
 
     function loadJson(key, fallback) {
@@ -419,6 +469,10 @@
       localStorage.setItem("tenpaiChanceHistory", JSON.stringify(state.history.slice(-100)));
     }
 
+    function saveReview() {
+      localStorage.setItem("tenpaiChanceReview", JSON.stringify(state.review.slice(-200)));
+    }
+
     function shuffle(arr) {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -426,6 +480,10 @@
         [a[i], a[j]] = [a[j], a[i]];
       }
       return a;
+    }
+
+    function sample(arr, count) {
+      return shuffle(arr).slice(0, Math.min(count, arr.length));
     }
 
     function tileKey(tile) { return `${tile.suit}${tile.num}`; }
@@ -439,6 +497,32 @@
     }
     function tileImage(tile) {
       return `${IMG_BASE}${SUIT_PREFIX[tile.suit]}${tile.num}-66-90-l.png`;
+    }
+
+    function tilesToHandString(tiles) {
+      const parts = [];
+      for (const suit of ["m", "p", "s"]) {
+        const nums = tiles.filter(tile => tile.suit === suit).map(tile => tile.num).sort((a, b) => a - b);
+        if (nums.length) parts.push(`${nums.join("")}${suit}`);
+      }
+      tiles.filter(tile => tile.suit === "z").forEach(tile => {
+        const honorKey = Object.entries(HONORS).find(([, num]) => num === tile.num)?.[0];
+        if (honorKey) parts.push(honorKey);
+      });
+      return parts.join("");
+    }
+
+    function transformedHandString(handString) {
+      const suitPerm = shuffle(["m", "p", "s"]);
+      const suitMap = { m: suitPerm[0], p: suitPerm[1], s: suitPerm[2] };
+      const reverseNums = Math.random() < 0.5;
+      const honorPerm = shuffle([1, 2, 3, 4, 5, 6, 7]);
+      const honorMap = Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((num, index) => [num, honorPerm[index]]));
+      const tiles = parseHand(handString).map(tile => {
+        if (tile.suit === "z") return { suit: "z", num: honorMap[tile.num] };
+        return { suit: suitMap[tile.suit], num: reverseNums ? 10 - tile.num : tile.num };
+      });
+      return tilesToHandString(tiles);
     }
 
     function parseHand(str) {
@@ -587,12 +671,28 @@
       return { id: idx + 1, hand, tiles: parseHand(hand), ...result };
     });
 
-    function startGame() {
-      state.deck = shuffle(computedProblems.filter(p => !p.issues.length));
+    function makeProblem(hand, id, randomized = true) {
+      const displayHand = randomized ? transformedHandString(hand) : hand;
+      const result = bestDiscards(displayHand);
+      return {
+        id,
+        sourceHand: hand,
+        hand: displayHand,
+        tiles: parseHand(displayHand),
+        ...result
+      };
+    }
+
+    function startGame(mode = "challenge", count = 5, sourceHands = null) {
+      const baseHands = sourceHands?.length ? sourceHands : computedProblems.filter(p => !p.issues.length).map(p => p.hand);
+      state.deck = sample(baseHands, count).map((hand, index) => makeProblem(hand, index + 1, true));
       state.index = 0;
       state.correct = 0;
       state.miss = 0;
       state.elapsed = 0;
+      state.mode = mode;
+      state.gameSize = count;
+      state.wrongResults = [];
       state.view = "play";
       loadCurrent();
     }
@@ -669,7 +769,21 @@
       state.checked = true;
       state.lastCorrect = ok;
       if (ok) state.correct += 1;
-      else state.miss += 1;
+      else {
+        state.miss += 1;
+        const wrong = {
+          sourceHand: state.current.sourceHand || state.current.hand,
+          hand: state.current.hand,
+          answers: state.current.answers,
+          selected: [...selectedAnswerKeys()],
+          total: state.current.scores[0]?.total || 0
+        };
+        state.wrongResults.push(wrong);
+        if (state.mode === "challenge") {
+          state.review.push({ sourceHand: wrong.sourceHand, missedAt: new Date().toISOString() });
+          saveReview();
+        }
+      }
       render();
     }
 
@@ -682,14 +796,16 @@
     function finishGame() {
       stopTimer();
       state.view = "result";
-      state.history.push({
-        date: new Date().toISOString(),
-        correct: state.correct,
-        miss: state.miss,
-        total: state.deck.length,
-        elapsed: Math.round(state.elapsed * 10) / 10
-      });
-      saveHistory();
+      if (state.mode === "challenge") {
+        state.history.push({
+          date: new Date().toISOString(),
+          correct: state.correct,
+          miss: state.miss,
+          total: state.deck.length,
+          elapsed: Math.round(state.elapsed * 10) / 10
+        });
+        saveHistory();
+      }
       render();
     }
 
@@ -708,6 +824,24 @@
       return `<button class="${cls}" type="button" onclick="toggleTile(${opts.index})" aria-label="${tileLabelFromKey(key)}">${img}</button>`;
     }
 
+    function renderMiniHand(tiles) {
+      return `<div class="mini-hand">${tiles.map(tile => renderTile(tile, { mini: true })).join("")}</div>`;
+    }
+
+    function renderProblemRow(p, extra = "") {
+      const answers = p.answers?.map(tileLabelFromKey).join(" / ") || "";
+      return `
+        <div class="problem-row">
+          <div>
+            ${renderMiniHand(p.tiles)}
+            ${extra ? `<div class="muted">${extra}</div>` : ""}
+            ${p.issues?.length ? `<div class="muted">要確認: ${p.issues.join(" / ")}</div>` : ""}
+          </div>
+          <div class="row-answer">${answers}</div>
+        </div>
+      `;
+    }
+
     function renderTop(active) {
       return `
         <div class="topbar">
@@ -716,27 +850,58 @@
         </div>
         <div class="tabs">
           <button class="tab ${active === "menu" ? "active" : ""}" onclick="setView('menu')">挑戦</button>
+          <button class="tab ${active === "review" ? "active" : ""}" onclick="setView('review')">復習</button>
           <button class="tab ${active === "list" ? "active" : ""}" onclick="setView('list')">問題一覧</button>
-          <button class="tab ${active === "record" ? "active" : ""}" onclick="setView('record')">成績</button>
+          <button class="tab ${active === "analysis" ? "active" : ""}" onclick="setView('analysis')">自己分析</button>
+          <button class="tab ${active === "settings" ? "active" : ""}" onclick="setView('settings')">設定</button>
         </div>
       `;
     }
 
     function renderMenu() {
-      const best = state.history.length ? Math.max(...state.history.map(h => h.correct)) : 0;
+      const best5 = state.history.filter(h => h.total === 5).length ? Math.max(...state.history.filter(h => h.total === 5).map(h => h.correct)) : 0;
+      const best15 = state.history.filter(h => h.total === 15).length ? Math.max(...state.history.filter(h => h.total === 15).map(h => h.correct)) : 0;
       return `
         ${renderTop("menu")}
         <section class="card">
           <div class="menu-grid">
-            <div class="mode-card">
-              <div>
-                <div class="mode-title">聴牌チャンス</div>
-                <div class="mode-note">14枚の牌姿から、聴牌へ進める有効牌が最も多くなる打牌を選びます。</div>
-              </div>
-              <div class="badge">${computedProblems.length}問</div>
+            <div class="section-head">
+              <h2 class="section-title">挑戦</h2>
+              <span class="muted">全${computedProblems.length}問</span>
             </div>
-            <button class="btn primary" onclick="startGame()">プレイ</button>
-            <div class="mode-note">Best ${best}/${computedProblems.length}　回答は問題の牌を直接タップします。</div>
+            <div class="mode-card big">
+              <div>
+                <div class="mode-title">5問</div>
+                <div class="mode-note">ウォームアップ用。ランダム出題。</div>
+              </div>
+              <button class="btn primary" onclick="startGame('challenge', 5)">開始</button>
+            </div>
+            <div class="mode-card big">
+              <div>
+                <div class="mode-title">15問</div>
+                <div class="mode-note">本番想定。誤答問題を成績発表で表示。</div>
+              </div>
+              <button class="btn primary" onclick="startGame('challenge', 15)">開始</button>
+            </div>
+            <div class="section-head">
+              <h2 class="section-title">練習</h2>
+              <span class="muted">誤答時に正解表示</span>
+            </div>
+            <div class="mode-card big">
+              <div>
+                <div class="mode-title">5問</div>
+                <div class="mode-note">正解表示中は計測停止。</div>
+              </div>
+              <button class="btn practice-btn" onclick="startGame('practice', 5)">練習</button>
+            </div>
+            <div class="mode-card big">
+              <div>
+                <div class="mode-title">15問</div>
+                <div class="mode-note">本番前の通し練習用。</div>
+              </div>
+              <button class="btn practice-btn" onclick="startGame('practice', 15)">練習</button>
+            </div>
+            <div class="mode-note">Best 5問 ${best5}/5　15問 ${best15}/15　回答は問題の牌を直接タップします。</div>
           </div>
         </section>
       `;
@@ -778,7 +943,7 @@
       const rate = total ? Math.round((state.correct / total) * 100) : 0;
       const rank = rate === 100 ? "神" : rate >= 90 ? "S" : rate >= 80 ? "A" : rate >= 70 ? "B" : rate >= 50 ? "C" : "D";
       return `
-        ${renderTop("record")}
+        ${renderTop("analysis")}
         <section class="card">
           <div class="prompt">成績発表</div>
           <div class="result-rank">${rank}</div>
@@ -789,9 +954,17 @@
           </div>
           <div class="actions">
             <button class="btn" onclick="setView('menu')">メニュー</button>
-            <button class="btn primary" onclick="startGame()">もう一度</button>
+            <button class="btn primary" onclick="startGame('${state.mode}', ${state.gameSize})">もう一度</button>
           </div>
         </section>
+        ${state.mode === "challenge" && state.wrongResults.length ? `
+          <section class="card">
+            <div class="prompt">誤答問題</div>
+            <div class="list">
+              ${state.wrongResults.map(w => renderProblemRow({ ...w, tiles: parseHand(w.hand) }, `選択 ${w.selected.map(tileLabelFromKey).join(" / ") || "-"}`)).join("")}
+            </div>
+          </section>
+        ` : ""}
       `;
     }
 
@@ -802,15 +975,32 @@
           <div class="prompt">問題一覧</div>
           <div class="list">
             ${computedProblems.map(p => `
-              <div class="problem-row">
-                <div>
-                  <div class="mini-hand">${p.tiles.map(tile => renderTile(tile, { mini: true })).join("")}</div>
-                  ${p.issues.length ? `<div class="muted">要確認: ${p.issues.join(" / ")}</div>` : ""}
-                </div>
-                <div class="row-answer">${p.answers.map(tileLabelFromKey).join(" / ")}</div>
-              </div>
+              ${renderProblemRow(p)}
             `).join("")}
           </div>
+        </section>
+      `;
+    }
+
+    function renderReview() {
+      const uniqueHands = [...new Set(state.review.map(item => item.sourceHand).filter(Boolean))];
+      const problems = uniqueHands.map((hand, index) => makeProblem(hand, index + 1, false));
+      return `
+        ${renderTop("review")}
+        <section class="card">
+          <div class="section-head">
+            <h2 class="section-title">復習</h2>
+            <span class="muted">${uniqueHands.length}問</span>
+          </div>
+          ${uniqueHands.length ? `
+            <div class="actions">
+              <button class="btn practice-btn" onclick="startGame('review', 5, ${JSON.stringify(uniqueHands).replaceAll('"', "&quot;")})">5問</button>
+              <button class="btn practice-btn" onclick="startGame('review', 15, ${JSON.stringify(uniqueHands).replaceAll('"', "&quot;")})">15問</button>
+            </div>
+            <div class="list" style="margin-top:14px">
+              ${problems.map(p => renderProblemRow(p)).join("")}
+            </div>
+          ` : `<div class="answer-panel">誤答問題はまだありません。</div>`}
         </section>
       `;
     }
@@ -818,9 +1008,9 @@
     function renderRecord() {
       const rows = [...state.history].reverse();
       return `
-        ${renderTop("record")}
+        ${renderTop("analysis")}
         <section class="card">
-          <div class="prompt">成績</div>
+          <div class="prompt">自己分析</div>
           ${rows.length ? `
             <div class="list">
               ${rows.map(h => `
@@ -835,20 +1025,32 @@
       `;
     }
 
+    function renderSettings() {
+      return `
+        ${renderTop("settings")}
+        <section class="card">
+          <div class="prompt">設定</div>
+          <div class="answer-panel">初期版では設定項目はまだありません。</div>
+        </section>
+      `;
+    }
+
     function render() {
       const app = document.getElementById("app");
       if (state.view === "menu") app.innerHTML = renderMenu();
       else if (state.view === "play") app.innerHTML = renderPlay();
       else if (state.view === "result") app.innerHTML = renderResult();
+      else if (state.view === "review") app.innerHTML = renderReview();
       else if (state.view === "list") app.innerHTML = renderList();
-      else if (state.view === "record") app.innerHTML = renderRecord();
+      else if (state.view === "analysis") app.innerHTML = renderRecord();
+      else if (state.view === "settings") app.innerHTML = renderSettings();
     }
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         if (state.view === "play" && state.checked) nextProblem();
         else if (state.view === "play") confirmAnswer();
-        else if (state.view === "result") startGame();
+        else if (state.view === "result") startGame(state.mode, state.gameSize);
       }
     });
 
