@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
-  <title>聴牌チャンス問題集 ver1</title>
+  <title>聴牌チャンス問題集 ver2</title>
   <style>
     :root {
       --bg: #061b17;
@@ -166,6 +166,7 @@
       border-radius: 4px;
       transform: translateY(0);
       transition: transform 0.1s ease, filter 0.1s ease;
+      touch-action: manipulation;
     }
     .tile-btn img {
       width: 100%;
@@ -329,7 +330,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 1;
+    const APP_VERSION = 2;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -603,9 +604,14 @@
       state.timerId = setInterval(() => {
         if (state.view === "play") {
           state.elapsed = (performance.now() - state.startedAt) / 1000;
-          render();
+          refreshTimerDisplay();
         }
       }, 250);
+    }
+
+    function refreshTimerDisplay() {
+      const timer = document.querySelector("[data-timer]");
+      if (timer) timer.textContent = `${state.elapsed.toFixed(1)}秒`;
     }
 
     function loadCurrent() {
@@ -616,10 +622,10 @@
       render();
     }
 
-    function toggleTile(key) {
+    function toggleTile(index) {
       if (state.checked) return;
-      if (state.selected.has(key)) state.selected.delete(key);
-      else state.selected.add(key);
+      if (state.selected.has(index)) state.selected.delete(index);
+      else state.selected.add(index);
       render();
     }
 
@@ -628,9 +634,19 @@
       return b.every(x => a.has(x));
     }
 
+    function selectedAnswerKeys() {
+      if (!state.current) return new Set();
+      return new Set([...state.selected].map(index => tileKey(state.current.tiles[index])));
+    }
+
+    function selectedAnswerText() {
+      const keys = [...selectedAnswerKeys()];
+      return keys.map(tileLabelFromKey).join(" / ") || "-";
+    }
+
     function confirmAnswer() {
       if (!state.current || state.checked || state.selected.size === 0) return;
-      const ok = sameSet(state.selected, state.current.answers);
+      const ok = sameSet(selectedAnswerKeys(), state.current.answers);
       state.checked = true;
       state.lastCorrect = ok;
       if (ok) state.correct += 1;
@@ -667,11 +683,11 @@
 
     function renderTile(tile, opts = {}) {
       const key = tileKey(tile);
-      const selected = opts.selected?.has(key);
+      const selected = typeof opts.index === "number" && opts.selected?.has(opts.index);
       const cls = opts.mini ? "" : `tile-btn${selected ? " selected" : ""}`;
       const img = `<img src="${tileImage(tile)}" alt="${tileLabelFromKey(key)}" draggable="false">`;
       if (opts.mini) return img;
-      return `<button class="${cls}" type="button" onclick="toggleTile('${key}')" aria-label="${tileLabelFromKey(key)}">${img}</button>`;
+      return `<button class="${cls}" type="button" onclick="toggleTile(${opts.index})" aria-label="${tileLabelFromKey(key)}">${img}</button>`;
     }
 
     function renderTop(active) {
@@ -712,18 +728,18 @@
       const p = state.current;
       const percent = ((state.index + (state.checked ? 1 : 0)) / state.deck.length) * 100;
       const answerText = p.answers.map(tileLabelFromKey).join(" / ");
-      const chosenText = [...state.selected].map(tileLabelFromKey).join(" / ") || "-";
+      const chosenText = selectedAnswerText();
       return `
         ${renderTop("")}
         <section class="card">
           <div class="status-row">
             <div class="progress">${state.index + 1}/${state.deck.length}</div>
             <div class="score">正解 ${state.correct}　ミス ${state.miss}</div>
-            <div class="timer">${state.elapsed.toFixed(1)}秒</div>
+            <div class="timer" data-timer>${state.elapsed.toFixed(1)}秒</div>
           </div>
           <div class="bar"><span style="width:${percent}%"></span></div>
           <div class="prompt">最も聴牌チャンスが多い打牌は？</div>
-          <div class="hand">${p.tiles.map(tile => renderTile(tile, { selected: state.selected })).join("")}</div>
+          <div class="hand">${p.tiles.map((tile, index) => renderTile(tile, { selected: state.selected, index })).join("")}</div>
           <div class="answer-panel ${state.checked ? (state.lastCorrect ? "ok" : "ng") : ""}">
             ${state.checked
               ? `${state.lastCorrect ? "○ 正解" : "× 不正解"}　選択 <strong>${chosenText}</strong><br>正解 <strong>${answerText}</strong>　受け入れ ${p.scores[0].total}枚`
