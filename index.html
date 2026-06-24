@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
-  <title>聴牌チャンス問題集 ver2</title>
+  <title>聴牌チャンス問題集 ver3</title>
   <style>
     :root {
       --bg: #061b17;
@@ -330,7 +330,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 2;
+    const APP_VERSION = 3;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -404,8 +404,8 @@
       lastCorrect: null,
       correct: 0,
       miss: 0,
-      startedAt: 0,
       elapsed: 0,
+      questionStartedAt: 0,
       timerId: null,
       history: loadJson("tenpaiChanceHistory", [])
     };
@@ -592,26 +592,43 @@
       state.index = 0;
       state.correct = 0;
       state.miss = 0;
-      state.startedAt = performance.now();
       state.elapsed = 0;
       state.view = "play";
-      startTimer();
       loadCurrent();
     }
 
     function startTimer() {
       clearInterval(state.timerId);
+      state.questionStartedAt = performance.now();
       state.timerId = setInterval(() => {
-        if (state.view === "play") {
-          state.elapsed = (performance.now() - state.startedAt) / 1000;
+        if (state.view === "play" && !state.checked) {
           refreshTimerDisplay();
         }
       }, 250);
     }
 
+    function currentElapsed() {
+      if (state.view === "play" && !state.checked && state.questionStartedAt) {
+        return state.elapsed + (performance.now() - state.questionStartedAt) / 1000;
+      }
+      return state.elapsed;
+    }
+
+    function stopTimer() {
+      if (state.timerId) {
+        clearInterval(state.timerId);
+        state.timerId = null;
+      }
+      if (state.questionStartedAt) {
+        state.elapsed += (performance.now() - state.questionStartedAt) / 1000;
+        state.questionStartedAt = 0;
+      }
+      refreshTimerDisplay();
+    }
+
     function refreshTimerDisplay() {
       const timer = document.querySelector("[data-timer]");
-      if (timer) timer.textContent = `${state.elapsed.toFixed(1)}秒`;
+      if (timer) timer.textContent = `${currentElapsed().toFixed(1)}秒`;
     }
 
     function loadCurrent() {
@@ -620,6 +637,7 @@
       state.checked = false;
       state.lastCorrect = null;
       render();
+      startTimer();
     }
 
     function toggleTile(index) {
@@ -646,6 +664,7 @@
 
     function confirmAnswer() {
       if (!state.current || state.checked || state.selected.size === 0) return;
+      stopTimer();
       const ok = sameSet(selectedAnswerKeys(), state.current.answers);
       state.checked = true;
       state.lastCorrect = ok;
@@ -661,8 +680,7 @@
     }
 
     function finishGame() {
-      clearInterval(state.timerId);
-      state.elapsed = (performance.now() - state.startedAt) / 1000;
+      stopTimer();
       state.view = "result";
       state.history.push({
         date: new Date().toISOString(),
@@ -735,7 +753,7 @@
           <div class="status-row">
             <div class="progress">${state.index + 1}/${state.deck.length}</div>
             <div class="score">正解 ${state.correct}　ミス ${state.miss}</div>
-            <div class="timer" data-timer>${state.elapsed.toFixed(1)}秒</div>
+            <div class="timer" data-timer>${currentElapsed().toFixed(1)}秒</div>
           </div>
           <div class="bar"><span style="width:${percent}%"></span></div>
           <div class="prompt">最も聴牌チャンスが多い打牌は？</div>
