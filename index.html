@@ -1,0 +1,824 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#06251e" />
+  <title>聴牌チャンス問題集 ver1</title>
+  <style>
+    :root {
+      --bg: #061b17;
+      --panel: rgba(3, 16, 14, 0.88);
+      --panel-2: rgba(8, 42, 35, 0.92);
+      --line: rgba(213, 178, 91, 0.42);
+      --text: #fff8dc;
+      --muted: #b9c8c2;
+      --gold: #f0bd53;
+      --orange: #e87927;
+      --red: #e5443d;
+      --blue: #4b9cff;
+      --green: #28c47a;
+      --tile-w: clamp(34px, 6.5vw, 46px);
+      --tile-gap: 2px;
+      font-family: "Yu Mincho", "Hiragino Mincho ProN", "Meiryo", serif;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
+    body {
+      overflow-x: hidden;
+      background:
+        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+        radial-gradient(circle at 50% 0%, rgba(38, 129, 99, 0.34), transparent 58%),
+        linear-gradient(180deg, #0b3a2e 0%, #061b17 55%, #020b0a 100%);
+      background-size: 28px 28px, 28px 28px, auto, auto;
+      touch-action: pan-y;
+    }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .app {
+      width: min(100%, 460px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 18px 16px 24px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0;
+      line-height: 1.1;
+      text-shadow: 0 3px 0 rgba(0,0,0,0.45), 0 0 18px rgba(240,189,83,0.12);
+    }
+    .badge {
+      border: 1px solid rgba(255,255,255,0.14);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      white-space: nowrap;
+      background: rgba(0,0,0,0.22);
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .tab {
+      min-height: 42px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 14px;
+      background: rgba(10, 48, 40, 0.72);
+      color: var(--text);
+      font-weight: 900;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .tab.active {
+      background: linear-gradient(180deg, #ffbd57 0%, #d96d25 100%);
+      color: #180d04;
+      border-color: rgba(255,255,255,0.72);
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: 0 18px 52px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.04);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .status-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: end;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .progress {
+      color: var(--gold);
+      font-size: 18px;
+      font-weight: 900;
+    }
+    .timer {
+      text-align: right;
+      font-size: 24px;
+      font-weight: 900;
+      color: #fff8dc;
+    }
+    .score {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .bar {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.11);
+      overflow: hidden;
+      margin: 6px 0 14px;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #ffcf60, #eb7029);
+      transition: width 0.18s ease;
+    }
+
+    .prompt {
+      margin: 4px 0 12px;
+      font-size: 18px;
+      line-height: 1.35;
+      font-weight: 900;
+      text-align: center;
+    }
+    .hand {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: var(--tile-gap);
+      min-height: calc(var(--tile-w) * 1.42 + 18px);
+      padding: 8px 3px 12px;
+      border-radius: 16px;
+      background: rgba(0,0,0,0.18);
+      overflow: visible;
+    }
+    .tile-btn {
+      width: var(--tile-w);
+      aspect-ratio: 66 / 90;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      background: transparent;
+      position: relative;
+      border-radius: 4px;
+      transform: translateY(0);
+      transition: transform 0.1s ease, filter 0.1s ease;
+    }
+    .tile-btn img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+      user-select: none;
+      pointer-events: none;
+    }
+    .tile-btn.selected {
+      transform: translateY(-10px);
+      filter: drop-shadow(0 0 8px rgba(255,207,96,0.72));
+    }
+    .tile-btn.selected::after {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border: 3px solid #ffcf60;
+      border-radius: 7px;
+      box-shadow: 0 0 0 2px rgba(56, 18, 0, 0.9);
+      pointer-events: none;
+    }
+
+    .answer-panel {
+      min-height: 58px;
+      border-radius: 16px;
+      background: rgba(0,0,0,0.22);
+      padding: 10px;
+      margin-top: 10px;
+      color: var(--muted);
+      text-align: center;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+    .answer-panel strong { color: var(--text); }
+    .answer-panel.ok strong { color: #ff6a5d; }
+    .answer-panel.ng strong { color: #73b4ff; }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .btn {
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 16px;
+      min-height: 54px;
+      color: var(--text);
+      font-weight: 900;
+      background: rgba(10, 48, 40, 0.82);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .btn.primary {
+      background: linear-gradient(180deg, #ffbd57 0%, #d96d25 100%);
+      color: #170b02;
+      border-color: rgba(255,255,255,0.72);
+    }
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+
+    .menu-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .mode-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid rgba(213,178,91,0.36);
+      border-radius: 18px;
+      background: rgba(0,0,0,0.20);
+    }
+    .mode-title {
+      font-size: 22px;
+      font-weight: 900;
+    }
+    .mode-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    .result-rank {
+      font-size: 72px;
+      line-height: 1;
+      font-weight: 900;
+      text-align: center;
+      margin: 18px 0 8px;
+      color: var(--gold);
+      text-shadow: 0 4px 0 rgba(0,0,0,0.55), 0 0 20px rgba(255,196,83,0.22);
+    }
+    .result-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      text-align: center;
+      margin-top: 14px;
+    }
+    .stat {
+      background: rgba(0,0,0,0.20);
+      border-radius: 14px;
+      padding: 10px 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .stat b {
+      display: block;
+      color: var(--text);
+      font-size: 22px;
+      margin-top: 4px;
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+    .problem-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      background: rgba(0,0,0,0.20);
+      border-radius: 16px;
+      padding: 10px;
+    }
+    .mini-hand {
+      display: flex;
+      gap: 1px;
+      align-items: center;
+      overflow: hidden;
+    }
+    .mini-hand img {
+      width: min(7.2vw, 29px);
+      aspect-ratio: 66 / 90;
+      object-fit: contain;
+      display: block;
+    }
+    .row-answer {
+      color: var(--gold);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .muted { color: var(--muted); }
+
+    @media (max-width: 360px) {
+      .app { padding-left: 10px; padding-right: 10px; }
+      h1 { font-size: 24px; }
+      :root { --tile-w: clamp(30px, 6.4vw, 36px); }
+    }
+  </style>
+</head>
+<body>
+  <main id="app" class="app"></main>
+
+  <script>
+    const APP_VERSION = 1;
+    const IMG_BASE = "tiles/";
+    const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
+    const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
+    const HONOR_LABEL = { E: "東", N: "南", W: "西", R: "北", H: "白", F: "發", C: "中" };
+
+    const PROBLEMS = [
+      "3347899m2244p666s",
+      "334566m6789p3445s",
+      "4555678m334p3457s",
+      "11223444556899s",
+      "122333p23345677s",
+      "111223m11222355p",
+      "2334m3445566p223s",
+      "11333356688999s",
+      "3456m3345p455566s",
+      "122333m23345677p",
+      "56m1234567888p45s",
+      "22446m344567p567s",
+      "11355689m456sCCC",
+      "123488m4556p2456s",
+      "1345m123p1233446s",
+      "33m445667p678889s",
+      "2334578m34p34566s",
+      "23388m244p234567s",
+      "234m44556p335577s",
+      "33345m3334577p45s",
+      "11122344457799s",
+      "335m33p123335sCCC",
+      "3345678m556p4556s",
+      "446m233456p22345s",
+      "11122445777799s",
+      "344m22334556678s",
+      "1233468m3345p345s",
+      "11456778p778sHHH",
+      "466m444566p56777s",
+      "4455m55566p888sNN",
+      "2355p12233s55999m",
+      "244m334567p34555s",
+      "23334556p344567s",
+      "12345567899m334p",
+      "1123555667899p1s",
+      "3344555m445p5667s",
+      "1222345m5679p778s",
+      "45m113445688p456s",
+      "334457m3555p2345s",
+      "123445789m11357s",
+      "34m2244556667p88s",
+      "235677788p45666s",
+      "3445577m3488p345s",
+      "11233344567799m",
+      "56m113445688p456s",
+      "66668m6667p24666s",
+      "344456m2334p3334s",
+      "24567m3334p24667s",
+      "56m113445688p456s",
+      "112334m799p23468s",
+      "345679m34446789s",
+      "567778m5667p6667s",
+      "1356778m4555678s",
+      "2334556m1123345p",
+      "11224555677888s"
+    ];
+
+    const state = {
+      view: "menu",
+      deck: [],
+      index: 0,
+      current: null,
+      selected: new Set(),
+      checked: false,
+      lastCorrect: null,
+      correct: 0,
+      miss: 0,
+      startedAt: 0,
+      elapsed: 0,
+      timerId: null,
+      history: loadJson("tenpaiChanceHistory", [])
+    };
+
+    function loadJson(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+      catch { return fallback; }
+    }
+
+    function saveHistory() {
+      localStorage.setItem("tenpaiChanceHistory", JSON.stringify(state.history.slice(-100)));
+    }
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function tileKey(tile) { return `${tile.suit}${tile.num}`; }
+    function tileLabelFromKey(key) {
+      const suit = key[0];
+      const num = Number(key.slice(1));
+      if (suit === "z") {
+        return Object.entries(HONORS).find(([, v]) => v === num)?.[0] ? HONOR_LABEL[Object.entries(HONORS).find(([, v]) => v === num)[0]] : "";
+      }
+      return `${num}${{ m: "ｍ", p: "ｐ", s: "ｓ" }[suit]}`;
+    }
+    function tileImage(tile) {
+      return `${IMG_BASE}${SUIT_PREFIX[tile.suit]}${tile.num}-66-90-l.png`;
+    }
+
+    function parseHand(str) {
+      const tiles = [];
+      let digits = [];
+      for (const ch of str) {
+        if (/[1-9]/.test(ch)) {
+          digits.push(Number(ch));
+        } else if ("mps".includes(ch)) {
+          digits.forEach(num => tiles.push({ suit: ch, num }));
+          digits = [];
+        } else if (HONORS[ch]) {
+          if (digits.length) throw new Error(`Invalid hand: ${str}`);
+          tiles.push({ suit: "z", num: HONORS[ch] });
+        }
+      }
+      if (digits.length) throw new Error(`Invalid hand: ${str}`);
+      return tiles;
+    }
+
+    function toCounts(tiles) {
+      const counts = Array(34).fill(0);
+      tiles.forEach(tile => counts[tileIndex(tile)] += 1);
+      return counts;
+    }
+
+    function tileIndex(tile) {
+      if (tile.suit === "m") return tile.num - 1;
+      if (tile.suit === "p") return 9 + tile.num - 1;
+      if (tile.suit === "s") return 18 + tile.num - 1;
+      return 27 + tile.num - 1;
+    }
+
+    function indexTile(i) {
+      if (i < 9) return { suit: "m", num: i + 1 };
+      if (i < 18) return { suit: "p", num: i - 8 };
+      if (i < 27) return { suit: "s", num: i - 17 };
+      return { suit: "z", num: i - 26 };
+    }
+
+    const meldMemo = new Map();
+    function canMeldSuit(counts) {
+      const key = counts.join("");
+      if (meldMemo.has(key)) return meldMemo.get(key);
+      const first = counts.findIndex(v => v > 0);
+      if (first < 0) return memo(key, true);
+      if (counts[first] >= 3) {
+        const next = [...counts];
+        next[first] -= 3;
+        if (canMeldSuit(next)) return memo(key, true);
+      }
+      if (first <= 6 && counts[first + 1] > 0 && counts[first + 2] > 0) {
+        const next = [...counts];
+        next[first] -= 1;
+        next[first + 1] -= 1;
+        next[first + 2] -= 1;
+        if (canMeldSuit(next)) return memo(key, true);
+      }
+      return memo(key, false);
+    }
+    function memo(key, value) { meldMemo.set(key, value); return value; }
+
+    function canAllMelds(counts) {
+      return canMeldSuit(counts.slice(0, 9))
+        && canMeldSuit(counts.slice(9, 18))
+        && canMeldSuit(counts.slice(18, 27))
+        && counts.slice(27).every(v => v % 3 === 0);
+    }
+
+    function isWin(counts) {
+      if (counts.reduce((a, b) => a + b, 0) !== 14) return false;
+      if (counts.filter(v => v === 2).length === 7) return true;
+      for (let i = 0; i < 34; i++) {
+        if (counts[i] >= 2) {
+          const next = [...counts];
+          next[i] -= 2;
+          if (canAllMelds(next)) return true;
+        }
+      }
+      return false;
+    }
+
+    const tenpaiMemo = new Map();
+    function isTenpai13(counts) {
+      const key = counts.join(",");
+      if (tenpaiMemo.has(key)) return tenpaiMemo.get(key);
+      if (counts.reduce((a, b) => a + b, 0) !== 13) return tenpaiMemo.set(key, false).get(key);
+      for (let i = 0; i < 34; i++) {
+        if (counts[i] < 4) {
+          const next = [...counts];
+          next[i] += 1;
+          if (isWin(next)) return tenpaiMemo.set(key, true).get(key);
+        }
+      }
+      return tenpaiMemo.set(key, false).get(key);
+    }
+
+    function canReachTenpaiAfterDraw(hand14) {
+      for (let d = 0; d < 34; d++) {
+        if (hand14[d] > 0) {
+          const next = [...hand14];
+          next[d] -= 1;
+          if (isTenpai13(next)) return true;
+        }
+      }
+      return false;
+    }
+
+    function bestDiscards(handString) {
+      const tiles = parseHand(handString);
+      const counts = toCounts(tiles);
+      const issues = [];
+      if (tiles.length !== 14) issues.push(`牌数が${tiles.length}枚です`);
+      counts.forEach((v, i) => { if (v > 4) issues.push(`${tileLabelFromKey(tileKey(indexTile(i)))}が${v}枚あります`); });
+      if (issues.length) return { issues, answers: [], scores: [] };
+
+      const scores = [];
+      for (let d = 0; d < 34; d++) {
+        if (counts[d] === 0) continue;
+        const base = [...counts];
+        base[d] -= 1;
+        let total = 0;
+        const draws = [];
+        for (let draw = 0; draw < 34; draw++) {
+          const remain = 4 - base[draw];
+          if (remain <= 0) continue;
+          const hand = [...base];
+          hand[draw] += 1;
+          if (canReachTenpaiAfterDraw(hand)) {
+            total += remain;
+            draws.push(draw);
+          }
+        }
+        scores.push({ discard: tileKey(indexTile(d)), total, draws });
+      }
+      const max = Math.max(...scores.map(s => s.total));
+      return {
+        issues,
+        answers: scores.filter(s => s.total === max).map(s => s.discard),
+        scores: scores.sort((a, b) => b.total - a.total)
+      };
+    }
+
+    const computedProblems = PROBLEMS.map((hand, idx) => {
+      const result = bestDiscards(hand);
+      return { id: idx + 1, hand, tiles: parseHand(hand), ...result };
+    });
+
+    function startGame() {
+      state.deck = shuffle(computedProblems.filter(p => !p.issues.length));
+      state.index = 0;
+      state.correct = 0;
+      state.miss = 0;
+      state.startedAt = performance.now();
+      state.elapsed = 0;
+      state.view = "play";
+      startTimer();
+      loadCurrent();
+    }
+
+    function startTimer() {
+      clearInterval(state.timerId);
+      state.timerId = setInterval(() => {
+        if (state.view === "play") {
+          state.elapsed = (performance.now() - state.startedAt) / 1000;
+          render();
+        }
+      }, 250);
+    }
+
+    function loadCurrent() {
+      state.current = state.deck[state.index];
+      state.selected = new Set();
+      state.checked = false;
+      state.lastCorrect = null;
+      render();
+    }
+
+    function toggleTile(key) {
+      if (state.checked) return;
+      if (state.selected.has(key)) state.selected.delete(key);
+      else state.selected.add(key);
+      render();
+    }
+
+    function sameSet(a, b) {
+      if (a.size !== b.length) return false;
+      return b.every(x => a.has(x));
+    }
+
+    function confirmAnswer() {
+      if (!state.current || state.checked || state.selected.size === 0) return;
+      const ok = sameSet(state.selected, state.current.answers);
+      state.checked = true;
+      state.lastCorrect = ok;
+      if (ok) state.correct += 1;
+      else state.miss += 1;
+      render();
+    }
+
+    function nextProblem() {
+      if (state.index + 1 >= state.deck.length) return finishGame();
+      state.index += 1;
+      loadCurrent();
+    }
+
+    function finishGame() {
+      clearInterval(state.timerId);
+      state.elapsed = (performance.now() - state.startedAt) / 1000;
+      state.view = "result";
+      state.history.push({
+        date: new Date().toISOString(),
+        correct: state.correct,
+        miss: state.miss,
+        total: state.deck.length,
+        elapsed: Math.round(state.elapsed * 10) / 10
+      });
+      saveHistory();
+      render();
+    }
+
+    function setView(view) {
+      clearInterval(state.timerId);
+      state.view = view;
+      render();
+    }
+
+    function renderTile(tile, opts = {}) {
+      const key = tileKey(tile);
+      const selected = opts.selected?.has(key);
+      const cls = opts.mini ? "" : `tile-btn${selected ? " selected" : ""}`;
+      const img = `<img src="${tileImage(tile)}" alt="${tileLabelFromKey(key)}" draggable="false">`;
+      if (opts.mini) return img;
+      return `<button class="${cls}" type="button" onclick="toggleTile('${key}')" aria-label="${tileLabelFromKey(key)}">${img}</button>`;
+    }
+
+    function renderTop(active) {
+      return `
+        <div class="topbar">
+          <h1>聴牌チャンス問題集</h1>
+          <div class="badge">ver${APP_VERSION}</div>
+        </div>
+        <div class="tabs">
+          <button class="tab ${active === "menu" ? "active" : ""}" onclick="setView('menu')">挑戦</button>
+          <button class="tab ${active === "list" ? "active" : ""}" onclick="setView('list')">問題一覧</button>
+          <button class="tab ${active === "record" ? "active" : ""}" onclick="setView('record')">成績</button>
+        </div>
+      `;
+    }
+
+    function renderMenu() {
+      const best = state.history.length ? Math.max(...state.history.map(h => h.correct)) : 0;
+      return `
+        ${renderTop("menu")}
+        <section class="card">
+          <div class="menu-grid">
+            <div class="mode-card">
+              <div>
+                <div class="mode-title">聴牌チャンス</div>
+                <div class="mode-note">14枚の牌姿から、聴牌へ進める有効牌が最も多くなる打牌を選びます。</div>
+              </div>
+              <div class="badge">${computedProblems.length}問</div>
+            </div>
+            <button class="btn primary" onclick="startGame()">プレイ</button>
+            <div class="mode-note">Best ${best}/${computedProblems.length}　回答は問題の牌を直接タップします。</div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderPlay() {
+      const p = state.current;
+      const percent = ((state.index + (state.checked ? 1 : 0)) / state.deck.length) * 100;
+      const answerText = p.answers.map(tileLabelFromKey).join(" / ");
+      const chosenText = [...state.selected].map(tileLabelFromKey).join(" / ") || "-";
+      return `
+        ${renderTop("")}
+        <section class="card">
+          <div class="status-row">
+            <div class="progress">${state.index + 1}/${state.deck.length}</div>
+            <div class="score">正解 ${state.correct}　ミス ${state.miss}</div>
+            <div class="timer">${state.elapsed.toFixed(1)}秒</div>
+          </div>
+          <div class="bar"><span style="width:${percent}%"></span></div>
+          <div class="prompt">最も聴牌チャンスが多い打牌は？</div>
+          <div class="hand">${p.tiles.map(tile => renderTile(tile, { selected: state.selected })).join("")}</div>
+          <div class="answer-panel ${state.checked ? (state.lastCorrect ? "ok" : "ng") : ""}">
+            ${state.checked
+              ? `${state.lastCorrect ? "○ 正解" : "× 不正解"}　選択 <strong>${chosenText}</strong><br>正解 <strong>${answerText}</strong>　受け入れ ${p.scores[0].total}枚`
+              : `選択中: <strong>${chosenText}</strong>`}
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="setView('menu')">メニュー</button>
+            ${state.checked
+              ? `<button class="btn primary" onclick="nextProblem()">次へ</button>`
+              : `<button class="btn primary" onclick="confirmAnswer()" ${state.selected.size ? "" : "disabled"}>確定</button>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderResult() {
+      const total = state.deck.length || computedProblems.length;
+      const rate = total ? Math.round((state.correct / total) * 100) : 0;
+      const rank = rate === 100 ? "神" : rate >= 90 ? "S" : rate >= 80 ? "A" : rate >= 70 ? "B" : rate >= 50 ? "C" : "D";
+      return `
+        ${renderTop("record")}
+        <section class="card">
+          <div class="prompt">成績発表</div>
+          <div class="result-rank">${rank}</div>
+          <div class="result-stats">
+            <div class="stat">正解<b>${state.correct}</b></div>
+            <div class="stat">ミス<b>${state.miss}</b></div>
+            <div class="stat">時間<b>${state.elapsed.toFixed(1)}秒</b></div>
+          </div>
+          <div class="actions">
+            <button class="btn" onclick="setView('menu')">メニュー</button>
+            <button class="btn primary" onclick="startGame()">もう一度</button>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderList() {
+      return `
+        ${renderTop("list")}
+        <section class="card">
+          <div class="prompt">問題一覧</div>
+          <div class="list">
+            ${computedProblems.map(p => `
+              <div class="problem-row">
+                <div>
+                  <div class="mini-hand">${p.tiles.map(tile => renderTile(tile, { mini: true })).join("")}</div>
+                  ${p.issues.length ? `<div class="muted">要確認: ${p.issues.join(" / ")}</div>` : ""}
+                </div>
+                <div class="row-answer">${p.answers.map(tileLabelFromKey).join(" / ")}</div>
+              </div>
+            `).join("")}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderRecord() {
+      const rows = [...state.history].reverse();
+      return `
+        ${renderTop("record")}
+        <section class="card">
+          <div class="prompt">成績</div>
+          ${rows.length ? `
+            <div class="list">
+              ${rows.map(h => `
+                <div class="problem-row">
+                  <div>${new Date(h.date).toLocaleString("ja-JP")}</div>
+                  <div class="row-answer">${h.correct}/${h.total}</div>
+                </div>
+              `).join("")}
+            </div>
+          ` : `<div class="answer-panel">まだ記録がありません。</div>`}
+        </section>
+      `;
+    }
+
+    function render() {
+      const app = document.getElementById("app");
+      if (state.view === "menu") app.innerHTML = renderMenu();
+      else if (state.view === "play") app.innerHTML = renderPlay();
+      else if (state.view === "result") app.innerHTML = renderResult();
+      else if (state.view === "list") app.innerHTML = renderList();
+      else if (state.view === "record") app.innerHTML = renderRecord();
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        if (state.view === "play" && state.checked) nextProblem();
+        else if (state.view === "play") confirmAnswer();
+        else if (state.view === "result") startGame();
+      }
+    });
+
+    window.addEventListener("load", render);
+  </script>
+</body>
+</html>
