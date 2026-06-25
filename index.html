@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
   <link rel="icon" href="data:," />
-  <title>聴牌チャンス（プロ試験対策） ver11</title>
+  <title>聴牌チャンス（プロ試験対策） ver12</title>
   <style>
     :root {
       --bg: #061b17;
@@ -225,9 +225,28 @@
       margin-top: 3px;
     }
     .answer-discard {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
       color: var(--text);
       font-weight: 900;
       margin-right: 2px;
+    }
+    .answer-tiles {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 2px;
+      vertical-align: middle;
+    }
+    .answer-tiles img,
+    .answer-discard img {
+      width: 20px;
+      height: auto;
+      display: block;
+      border-radius: 2px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
     .answer-draws {
       display: inline-flex;
@@ -460,7 +479,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 11;
+    const APP_VERSION = 12;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -894,7 +913,21 @@
 
     function selectedAnswerText() {
       const keys = [...selectedAnswerKeys()];
-      return keys.map(tileLabelFromKey).join(" / ") || "-";
+      return renderInlineTileKeys(keys);
+    }
+
+    function tileFromKey(key) {
+      return { suit: key[0], num: Number(key.slice(1)) };
+    }
+
+    function renderInlineTileKey(key) {
+      const tile = tileFromKey(key);
+      return `<img src="${tileImage(tile)}" alt="${tileLabelFromKey(key)}" draggable="false">`;
+    }
+
+    function renderInlineTileKeys(keys) {
+      if (!keys.length) return "-";
+      return `<span class="answer-tiles">${keys.map(renderInlineTileKey).join("")}</span>`;
     }
 
     function updateProblemStats(hand, ok) {
@@ -924,14 +957,14 @@
 
     function acceptanceDetail(problem, discardKey) {
       const score = problem.scores?.find(item => item.discard === discardKey);
-      if (!score) return `${tileLabelFromKey(discardKey)}: -`;
+      if (!score) return `${renderInlineTileKey(discardKey)}: -`;
       const drawTiles = score.draws.map(index => {
         const tile = indexTile(index);
         return `<img src="${tileImage(tile)}" alt="${tileLabelFromKey(tileKey(tile))}" draggable="false">`;
       }).join("");
       return `
         <div class="answer-line">
-          <span class="answer-discard">${tileLabelFromKey(discardKey)}:</span>
+          <span class="answer-discard">${renderInlineTileKey(discardKey)}:</span>
           <span>${score.draws.length}種${score.total}枚</span>
           <span class="answer-draws">${drawTiles || "-"}</span>
         </div>
@@ -1123,7 +1156,7 @@
     function renderPlay() {
       const p = state.current;
       const percent = ((state.index + (state.checked ? 1 : 0)) / state.deck.length) * 100;
-      const answerText = p.answers.map(tileLabelFromKey).join(" / ");
+      const answerText = renderInlineTileKeys(p.answers);
       const chosenText = selectedAnswerText();
       return `
         ${renderTop("")}
