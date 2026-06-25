@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
   <link rel="icon" href="data:," />
-  <title>聴牌チャンス問題集 ver6</title>
+  <title>聴牌チャンス問題集 ver7</title>
   <style>
     :root {
       --bg: #061b17;
@@ -207,6 +207,16 @@
     .answer-panel strong { color: var(--text); }
     .answer-panel.ok strong { color: #ff6a5d; }
     .answer-panel.ng strong { color: #73b4ff; }
+    .answer-detail {
+      margin-top: 6px;
+      font-size: 13px;
+      line-height: 1.55;
+      text-align: left;
+    }
+    .answer-detail-title {
+      color: var(--gold);
+      font-weight: 900;
+    }
 
     .actions {
       display: grid;
@@ -377,7 +387,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 6;
+    const APP_VERSION = 7;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -795,6 +805,25 @@
       return keys.map(tileLabelFromKey).join(" / ") || "-";
     }
 
+    function acceptanceDetail(problem, discardKey) {
+      const score = problem.scores?.find(item => item.discard === discardKey);
+      if (!score) return `${tileLabelFromKey(discardKey)}: -`;
+      const drawText = score.draws.map(index => tileLabelFromKey(tileKey(indexTile(index)))).join(" / ") || "-";
+      return `${tileLabelFromKey(discardKey)}: ${score.draws.length}種${score.total}枚（${drawText}）`;
+    }
+
+    function answerExplanation(problem) {
+      const correctDetails = problem.answers.map(key => acceptanceDetail(problem, key)).join("<br>");
+      const selectedDetails = [...selectedAnswerKeys()].map(key => acceptanceDetail(problem, key)).join("<br>");
+      return `
+        <div class="answer-detail">
+          <span class="answer-detail-title">正解の受け入れ</span><br>
+          ${correctDetails}
+          ${state.lastCorrect ? "" : `<br><span class="answer-detail-title">選択牌の受け入れ</span><br>${selectedDetails}`}
+        </div>
+      `;
+    }
+
     function confirmAnswer() {
       if (!state.current || state.checked || state.selected.size === 0) return;
       stopTimer();
@@ -958,7 +987,7 @@
           <div class="hand">${p.tiles.map((tile, index) => renderTile(tile, { selected: state.selected, index })).join("")}</div>
           <div class="answer-panel ${state.checked ? (state.lastCorrect ? "ok" : "ng") : ""}">
             ${state.checked
-              ? `${state.lastCorrect ? "○ 正解" : "× 不正解"}　選択 <strong>${chosenText}</strong><br>正解 <strong>${answerText}</strong>　受け入れ ${p.scores[0].total}枚`
+              ? `${state.lastCorrect ? "○ 正解" : "× 不正解"}　選択 <strong>${chosenText}</strong><br>正解 <strong>${answerText}</strong>${answerExplanation(p)}`
               : `選択中: <strong>${chosenText}</strong>`}
           </div>
           <div class="actions">
