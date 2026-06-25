@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
   <link rel="icon" href="data:," />
-  <title>聴牌チャンス（プロ試験対策） ver16</title>
+  <title>聴牌チャンス（プロ試験対策） ver17</title>
   <style>
     :root {
       --bg: #061b17;
@@ -374,6 +374,49 @@
       margin-top: 4px;
       line-height: 1.4;
     }
+    .best-line {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1.35;
+    }
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      vertical-align: middle;
+    }
+    .god-rank {
+      display: inline-block;
+      width: 1.45em;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border-radius: 999px;
+      filter: drop-shadow(0 0 12px rgba(242,210,123,0.48));
+      vertical-align: middle;
+    }
+    .god-rank.menu {
+      width: 30px;
+    }
+    .god-rank.result {
+      width: 92px;
+    }
+    .rainbow-text {
+      background: linear-gradient(to right, #ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6, #ef4444);
+      background-size: 200% auto;
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: rainbow 3s linear infinite;
+    }
+    @keyframes rainbow { to { background-position: 200% center; } }
+    .gold-text { color: #d8a83c; text-shadow: 0 0 8px rgba(216,168,60,0.25); }
+    .rank-a { color: #fca5a5; }
+    .rank-b { color: #6ee7b7; }
+    .rank-c { color: #7dd3fc; }
+    .rank-low { color: #cbd5e1; }
 
     .result-rank {
       font-size: 72px;
@@ -383,6 +426,14 @@
       margin: 18px 0 8px;
       color: var(--gold);
       text-shadow: 0 4px 0 rgba(0,0,0,0.55), 0 0 20px rgba(255,196,83,0.22);
+    }
+    .result-score {
+      text-align: center;
+      color: var(--text);
+      font-size: 30px;
+      line-height: 1;
+      font-weight: 900;
+      text-shadow: 0 0 14px rgba(240,189,83,0.22);
     }
     .result-stats {
       display: grid;
@@ -500,7 +551,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 16;
+    const APP_VERSION = 17;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -578,6 +629,7 @@
       gameSize: 5,
       wrongResults: [],
       history: loadJson("tenpaiChanceHistory", []),
+      bestScores: loadJson("tenpaiChanceBestScores", {}),
       review: loadJson("tenpaiChanceReview", []),
       problemStats: loadJson("tenpaiChanceProblemStats", {}),
       favorites: loadJson("tenpaiChanceFavorites", [])
@@ -590,6 +642,10 @@
 
     function saveHistory() {
       localStorage.setItem("tenpaiChanceHistory", JSON.stringify(state.history.slice(-100)));
+    }
+
+    function saveBestScores() {
+      localStorage.setItem("tenpaiChanceBestScores", JSON.stringify(state.bestScores));
     }
 
     function saveReview() {
@@ -948,6 +1004,80 @@
       return `<span class="answer-tiles">${keys.map(renderInlineTileKey).join("")}</span>`;
     }
 
+    const RANK_THRESHOLDS = [
+      ["神", 1040], ["SS", 1000], ["S", 930], ["A+", 870], ["A", 800], ["A-", 740],
+      ["B+", 680], ["B", 620], ["B-", 560], ["C", 460], ["D", 320], ["E", 0]
+    ];
+
+    function resultScore(correct, total, elapsed) {
+      if (!total) return 0;
+      const rateScore = (correct / total) * 1000;
+      const averageSeconds = elapsed / total;
+      const speedBonus = Math.max(0, 80 - averageSeconds * 12);
+      return Math.max(0, Math.round(rateScore + speedBonus));
+    }
+
+    function rankForScore(score) {
+      return RANK_THRESHOLDS.find(([, threshold]) => score >= threshold)?.[0] || "E";
+    }
+
+    function rankClass(rank) {
+      if (rank === "神" || rank === "SS") return "rainbow-text";
+      if (rank === "S") return "gold-text";
+      if (rank?.startsWith("A")) return "rank-a";
+      if (rank?.startsWith("B")) return "rank-b";
+      if (rank === "C") return "rank-c";
+      return "rank-low";
+    }
+
+    function rankBadge(rank, size = "menu") {
+      if (rank === "神") {
+        return `<img class="god-rank ${size}" src="assets/god-rank.png" alt="神">`;
+      }
+      return `<span class="rank-badge ${rankClass(rank)}">${rank}</span>`;
+    }
+
+    function normalizedResultRecord(record) {
+      const total = record?.total || 0;
+      const elapsed = Number(record?.elapsed) || 0;
+      const correct = Number(record?.correct) || 0;
+      const score = Number.isFinite(record?.score) ? record.score : resultScore(correct, total, elapsed);
+      const rank = record?.rank || rankForScore(score);
+      return { ...record, total, elapsed, correct, score, rank };
+    }
+
+    function isBetterRecord(next, prev) {
+      if (!prev) return true;
+      if (next.score !== prev.score) return next.score > prev.score;
+      if (next.correct !== prev.correct) return next.correct > prev.correct;
+      return next.elapsed < prev.elapsed;
+    }
+
+    function bestRecordFor(total) {
+      const stored = state.bestScores[String(total)] ? normalizedResultRecord(state.bestScores[String(total)]) : null;
+      const fromHistory = state.history
+        .filter(item => item.total === total)
+        .map(normalizedResultRecord)
+        .reduce((best, item) => isBetterRecord(item, best) ? item : best, null);
+      return isBetterRecord(fromHistory, stored) ? fromHistory : stored;
+    }
+
+    function updateBestRecord(record) {
+      const totalKey = String(record.total);
+      const current = state.bestScores[totalKey] ? normalizedResultRecord(state.bestScores[totalKey]) : null;
+      if (isBetterRecord(record, current)) {
+        state.bestScores[totalKey] = record;
+        saveBestScores();
+      }
+    }
+
+    function formatBestRecord(total) {
+      const record = bestRecordFor(total);
+      if (!record) return "Best -";
+      const average = record.total ? (record.elapsed / record.total).toFixed(1) : "-";
+      return `Best ${record.score}pt / ${rankBadge(record.rank, "menu")} / ${average}秒/問`;
+    }
+
     let audioContext = null;
     function playCorrectSound() {
       try {
@@ -1088,14 +1218,20 @@
       stopTimer();
       state.view = "result";
       if (state.mode === "challenge") {
-        state.history.push({
+        const score = resultScore(state.correct, state.deck.length, state.elapsed);
+        const rank = rankForScore(score);
+        const record = {
           date: new Date().toISOString(),
           correct: state.correct,
           miss: state.miss,
           total: state.deck.length,
-          elapsed: Math.round(state.elapsed * 10) / 10
-        });
+          elapsed: Math.round(state.elapsed * 10) / 10,
+          score,
+          rank
+        };
+        state.history.push(record);
         saveHistory();
+        updateBestRecord(record);
       }
       render();
     }
@@ -1174,9 +1310,6 @@
     }
 
     function renderMenu() {
-      const best5 = state.history.filter(h => h.total === 5).length ? Math.max(...state.history.filter(h => h.total === 5).map(h => h.correct)) : 0;
-      const best15 = state.history.filter(h => h.total === 15).length ? Math.max(...state.history.filter(h => h.total === 15).map(h => h.correct)) : 0;
-      const bestAll = state.history.filter(h => h.total === PROBLEMS.length).length ? Math.max(...state.history.filter(h => h.total === PROBLEMS.length).map(h => h.correct)) : 0;
       return `
         ${renderTop("menu")}
         <section class="card">
@@ -1189,6 +1322,7 @@
               <div>
                 <div class="mode-title">5問</div>
                 <div class="mode-note">ウォームアップ用。ランダム出題。</div>
+                <div class="best-line">${formatBestRecord(5)}</div>
               </div>
               <button class="btn primary" onclick="startGame('challenge', 5)">開始</button>
             </div>
@@ -1196,6 +1330,7 @@
               <div>
                 <div class="mode-title">15問</div>
                 <div class="mode-note">本番想定。誤答問題を成績発表で表示。</div>
+                <div class="best-line">${formatBestRecord(15)}</div>
               </div>
               <button class="btn primary" onclick="startGame('challenge', 15)">開始</button>
             </div>
@@ -1203,10 +1338,11 @@
               <div>
                 <div class="mode-title">${PROBLEMS.length}問</div>
                 <div class="mode-note">全問題通し。弱点確認用。</div>
+                <div class="best-line">${formatBestRecord(PROBLEMS.length)}</div>
               </div>
               <button class="btn primary" onclick="startGame('challenge', PROBLEMS.length)">開始</button>
             </div>
-            <div class="mode-note">Best 5問 ${best5}/5　15問 ${best15}/15　${PROBLEMS.length}問 ${bestAll}/${PROBLEMS.length}　回答は問題の牌を直接タップします。</div>
+            <div class="mode-note">回答は問題の牌を直接タップします。</div>
           </div>
         </section>
       `;
@@ -1244,13 +1380,14 @@
 
     function renderResult() {
       const total = state.deck.length || PROBLEMS.length;
-      const rate = total ? Math.round((state.correct / total) * 100) : 0;
-      const rank = rate === 100 ? "神" : rate >= 90 ? "S" : rate >= 80 ? "A" : rate >= 70 ? "B" : rate >= 50 ? "C" : "D";
+      const score = resultScore(state.correct, total, state.elapsed);
+      const rank = rankForScore(score);
       return `
         ${renderTop("analysis")}
         <section class="card">
           <div class="prompt">成績発表</div>
-          <div class="result-rank">${rank}</div>
+          <div class="result-rank">${rankBadge(rank, "result")}</div>
+          <div class="result-score">${score}pt</div>
           <div class="result-stats">
             <div class="stat">正解<b>${state.correct}</b></div>
             <div class="stat">ミス<b>${state.miss}</b></div>
