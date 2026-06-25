@@ -4,7 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
-  <title>聴牌チャンス問題集 ver5</title>
+  <link rel="icon" href="data:," />
+  <title>聴牌チャンス問題集 ver6</title>
   <style>
     :root {
       --bg: #061b17;
@@ -376,7 +377,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 5;
+    const APP_VERSION = 6;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -666,25 +667,57 @@
       };
     }
 
-    const computedProblems = PROBLEMS.map((hand, idx) => {
-      const result = bestDiscards(hand);
-      return { id: idx + 1, hand, tiles: parseHand(hand), ...result };
-    });
+    const sourceProblemCache = new Map();
+    const computedProblemCache = new Map();
+
+    function validateHand(handString) {
+      const tiles = parseHand(handString);
+      const counts = toCounts(tiles);
+      const issues = [];
+      if (tiles.length !== 14) issues.push(`牌数が${tiles.length}枚です`);
+      counts.forEach((v, i) => { if (v > 4) issues.push(`${tileLabelFromKey(tileKey(indexTile(i)))}が${v}枚あります`); });
+      return { tiles, issues };
+    }
+
+    function sourceProblem(hand, id) {
+      if (!sourceProblemCache.has(hand)) {
+        sourceProblemCache.set(hand, { hand, ...validateHand(hand) });
+      }
+      return { id, ...sourceProblemCache.get(hand) };
+    }
+
+    function sourceProblems() {
+      return PROBLEMS.map((hand, index) => sourceProblem(hand, index + 1));
+    }
+
+    function validSourceHands() {
+      return sourceProblems().filter(p => !p.issues.length).map(p => p.hand);
+    }
+
+    function computedProblem(hand) {
+      if (!computedProblemCache.has(hand)) {
+        const result = bestDiscards(hand);
+        computedProblemCache.set(hand, {
+          hand,
+          tiles: parseHand(hand),
+          ...result
+        });
+      }
+      return computedProblemCache.get(hand);
+    }
 
     function makeProblem(hand, id, randomized = true) {
       const displayHand = randomized ? transformedHandString(hand) : hand;
-      const result = bestDiscards(displayHand);
+      const result = computedProblem(displayHand);
       return {
         id,
         sourceHand: hand,
-        hand: displayHand,
-        tiles: parseHand(displayHand),
         ...result
       };
     }
 
     function startGame(mode = "challenge", count = 5, sourceHands = null) {
-      const baseHands = sourceHands?.length ? sourceHands : computedProblems.filter(p => !p.issues.length).map(p => p.hand);
+      const baseHands = sourceHands?.length ? sourceHands : validSourceHands();
       state.deck = sample(baseHands, count).map((hand, index) => makeProblem(hand, index + 1, true));
       state.index = 0;
       state.correct = 0;
@@ -867,7 +900,7 @@
           <div class="menu-grid">
             <div class="section-head">
               <h2 class="section-title">挑戦</h2>
-              <span class="muted">全${computedProblems.length}問</span>
+              <span class="muted">全${PROBLEMS.length}問</span>
             </div>
             <div class="mode-card big">
               <div>
@@ -939,7 +972,7 @@
     }
 
     function renderResult() {
-      const total = state.deck.length || computedProblems.length;
+      const total = state.deck.length || PROBLEMS.length;
       const rate = total ? Math.round((state.correct / total) * 100) : 0;
       const rank = rate === 100 ? "神" : rate >= 90 ? "S" : rate >= 80 ? "A" : rate >= 70 ? "B" : rate >= 50 ? "C" : "D";
       return `
@@ -969,12 +1002,16 @@
     }
 
     function renderList() {
+      const problems = sourceProblems().map(p => {
+        if (p.issues.length) return p;
+        return { id: p.id, sourceHand: p.hand, ...computedProblem(p.hand) };
+      });
       return `
         ${renderTop("list")}
         <section class="card">
           <div class="prompt">問題一覧</div>
           <div class="list">
-            ${computedProblems.map(p => `
+            ${problems.map(p => `
               ${renderProblemRow(p)}
             `).join("")}
           </div>
