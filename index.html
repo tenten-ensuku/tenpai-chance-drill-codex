@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
   <link rel="icon" href="data:," />
-  <title>聴牌チャンス（プロ試験対策） ver13</title>
+  <title>聴牌チャンス（プロ試験対策） ver14</title>
   <style>
     :root {
       --bg: #061b17;
@@ -480,7 +480,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 13;
+    const APP_VERSION = 14;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -1108,6 +1108,7 @@
     function renderMenu() {
       const best5 = state.history.filter(h => h.total === 5).length ? Math.max(...state.history.filter(h => h.total === 5).map(h => h.correct)) : 0;
       const best15 = state.history.filter(h => h.total === 15).length ? Math.max(...state.history.filter(h => h.total === 15).map(h => h.correct)) : 0;
+      const best55 = state.history.filter(h => h.total === PROBLEMS.length).length ? Math.max(...state.history.filter(h => h.total === PROBLEMS.length).map(h => h.correct)) : 0;
       return `
         ${renderTop("menu")}
         <section class="card">
@@ -1130,25 +1131,14 @@
               </div>
               <button class="btn primary" onclick="startGame('challenge', 15)">開始</button>
             </div>
-            <div class="section-head">
-              <h2 class="section-title">練習</h2>
-              <span class="muted">誤答時に正解表示</span>
-            </div>
             <div class="mode-card big">
               <div>
-                <div class="mode-title">5問</div>
-                <div class="mode-note">正解表示中は計測停止。</div>
+                <div class="mode-title">55問</div>
+                <div class="mode-note">全問題通し。弱点確認用。</div>
               </div>
-              <button class="btn practice-btn" onclick="startGame('practice', 5)">練習</button>
+              <button class="btn primary" onclick="startGame('challenge', PROBLEMS.length)">開始</button>
             </div>
-            <div class="mode-card big">
-              <div>
-                <div class="mode-title">15問</div>
-                <div class="mode-note">本番前の通し練習用。</div>
-              </div>
-              <button class="btn practice-btn" onclick="startGame('practice', 15)">練習</button>
-            </div>
-            <div class="mode-note">Best 5問 ${best5}/5　15問 ${best15}/15　回答は問題の牌を直接タップします。</div>
+            <div class="mode-note">Best 5問 ${best5}/5　15問 ${best15}/15　55問 ${best55}/${PROBLEMS.length}　回答は問題の牌を直接タップします。</div>
           </div>
         </section>
       `;
