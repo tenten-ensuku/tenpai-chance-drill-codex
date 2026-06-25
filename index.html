@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
   <link rel="icon" href="data:," />
-  <title>聴牌チャンス問題集 ver7</title>
+  <title>聴牌チャンス問題集 ver8</title>
   <style>
     :root {
       --bg: #061b17;
@@ -217,6 +217,31 @@
       color: var(--gold);
       font-weight: 900;
     }
+    .answer-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 3px 5px;
+      margin-top: 3px;
+    }
+    .answer-discard {
+      color: var(--text);
+      font-weight: 900;
+      margin-right: 2px;
+    }
+    .answer-draws {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1px;
+    }
+    .answer-draws img {
+      width: 15px;
+      height: auto;
+      display: block;
+      border-radius: 2px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
 
     .actions {
       display: grid;
@@ -387,7 +412,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 7;
+    const APP_VERSION = 8;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -808,13 +833,22 @@
     function acceptanceDetail(problem, discardKey) {
       const score = problem.scores?.find(item => item.discard === discardKey);
       if (!score) return `${tileLabelFromKey(discardKey)}: -`;
-      const drawText = score.draws.map(index => tileLabelFromKey(tileKey(indexTile(index)))).join(" / ") || "-";
-      return `${tileLabelFromKey(discardKey)}: ${score.draws.length}種${score.total}枚（${drawText}）`;
+      const drawTiles = score.draws.map(index => {
+        const tile = indexTile(index);
+        return `<img src="${tileImage(tile)}" alt="${tileLabelFromKey(tileKey(tile))}" draggable="false">`;
+      }).join("");
+      return `
+        <div class="answer-line">
+          <span class="answer-discard">${tileLabelFromKey(discardKey)}:</span>
+          <span>${score.draws.length}種${score.total}枚</span>
+          <span class="answer-draws">${drawTiles || "-"}</span>
+        </div>
+      `;
     }
 
     function answerExplanation(problem) {
-      const correctDetails = problem.answers.map(key => acceptanceDetail(problem, key)).join("<br>");
-      const selectedDetails = [...selectedAnswerKeys()].map(key => acceptanceDetail(problem, key)).join("<br>");
+      const correctDetails = problem.answers.map(key => acceptanceDetail(problem, key)).join("");
+      const selectedDetails = [...selectedAnswerKeys()].map(key => acceptanceDetail(problem, key)).join("");
       return `
         <div class="answer-detail">
           <span class="answer-detail-title">正解の受け入れ</span><br>
