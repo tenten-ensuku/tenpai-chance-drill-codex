@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
   <link rel="icon" href="data:," />
-  <title>聴牌チャンス問題集 ver9</title>
+  <title>聴牌チャンス問題集 ver10</title>
   <style>
     :root {
       --bg: #061b17;
@@ -249,6 +249,14 @@
       gap: 10px;
       margin-top: 14px;
     }
+    .actions.three {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .actions.three .btn {
+      min-height: 48px;
+      border-radius: 14px;
+      font-size: 14px;
+    }
     .btn {
       border: 1px solid rgba(255,255,255,0.18);
       border-radius: 16px;
@@ -452,7 +460,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 9;
+    const APP_VERSION = 10;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -1174,7 +1182,9 @@
     }
 
     function renderList() {
-      const problems = sourceProblems().map(p => {
+      const sources = sourceProblems();
+      const playableHands = sources.filter(p => !p.issues.length).map(p => p.hand);
+      const problems = sources.map(p => {
         if (p.issues.length) return p;
         return { id: p.id, sourceHand: p.hand, ...computedProblem(p.hand) };
       });
@@ -1182,6 +1192,10 @@
         ${renderTop("list")}
         <section class="card">
           <div class="prompt">問題一覧</div>
+          <div class="actions">
+            <button class="btn practice-btn" onclick="startGame('review', ${playableHands.length}, ${htmlJson(playableHands)})">まとめて解く</button>
+            <button class="btn" onclick="setView('menu')">挑戦へ戻る</button>
+          </div>
           <div class="list">
             ${problems.map(p => `
               ${renderProblemRow(p)}
@@ -1204,9 +1218,10 @@
             <span class="muted">${uniqueHands.length}問</span>
           </div>
           ${uniqueHands.length ? `
-            <div class="actions">
+            <div class="actions three">
               <button class="btn practice-btn" onclick="startGame('review', 5, ${JSON.stringify(uniqueHands).replaceAll('"', "&quot;")})">5問</button>
               <button class="btn practice-btn" onclick="startGame('review', 15, ${JSON.stringify(uniqueHands).replaceAll('"', "&quot;")})">15問</button>
+              <button class="btn practice-btn" onclick="startGame('review', ${uniqueHands.length}, ${htmlJson(uniqueHands)})">まとめて解く</button>
             </div>
             <div class="list" style="margin-top:14px">
               ${problems.map(p => renderProblemRow(p)).join("")}
@@ -1219,9 +1234,10 @@
             <span class="muted">${favoriteHands.length}問</span>
           </div>
           ${favoriteHands.length ? `
-            <div class="actions">
+            <div class="actions three">
               <button class="btn practice-btn" onclick="startGame('review', 5, ${htmlJson(favoriteHands)})">5問</button>
               <button class="btn practice-btn" onclick="startGame('review', 15, ${htmlJson(favoriteHands)})">15問</button>
+              <button class="btn practice-btn" onclick="startGame('review', ${favoriteHands.length}, ${htmlJson(favoriteHands)})">まとめて解く</button>
             </div>
             <div class="list" style="margin-top:14px">
               ${favoriteProblems.map(p => renderProblemRow(p)).join("")}
