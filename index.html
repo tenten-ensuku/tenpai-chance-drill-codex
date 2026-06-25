@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#06251e" />
   <link rel="icon" href="data:," />
-  <title>聴牌チャンス問題集 ver8</title>
+  <title>聴牌チャンス問題集 ver9</title>
   <style>
     :root {
       --bg: #061b17;
@@ -364,12 +364,15 @@
     }
     .problem-row {
       display: grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       align-items: center;
       background: rgba(0,0,0,0.20);
       border-radius: 16px;
       padding: 10px;
+      min-width: 0;
+    }
+    .problem-main {
       min-width: 0;
     }
     .mini-hand {
@@ -390,8 +393,44 @@
     .row-answer {
       color: var(--gold);
       font-weight: 900;
-      white-space: nowrap;
-      justify-self: end;
+      line-height: 1.45;
+      margin-top: 5px;
+      overflow-wrap: anywhere;
+    }
+    .accuracy {
+      color: var(--text);
+      font-weight: 900;
+      margin-top: 4px;
+      font-size: 13px;
+    }
+    .accuracy-bar {
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.09);
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .accuracy-bar > span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #e95c4f 0%, #f5de74 52%, #3fd094 100%);
+    }
+    .favorite-btn {
+      min-width: 78px;
+      min-height: 50px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: #ffe37a;
+      font-weight: 900;
+      font-size: 16px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .favorite-btn.active {
+      background: linear-gradient(180deg, #ffe884 0%, #ffd45f 100%);
+      color: #2a1900;
+      border-color: rgba(255,255,255,0.72);
     }
     .muted { color: var(--muted); }
 
@@ -405,6 +444,7 @@
       .mode-card.big .mode-title { font-size: 30px; }
       .mode-card.big .btn { width: 82px; }
       .mini-hand img { width: 16px; }
+      .favorite-btn { min-width: 68px; font-size: 14px; }
     }
   </style>
 </head>
@@ -412,7 +452,7 @@
   <main id="app" class="app"></main>
 
   <script>
-    const APP_VERSION = 8;
+    const APP_VERSION = 9;
     const IMG_BASE = "tiles/";
     const SUIT_PREFIX = { m: "man", p: "pin", s: "sou", z: "ji" };
     const HONORS = { E: 1, N: 2, W: 3, R: 4, H: 5, F: 6, C: 7 };
@@ -493,7 +533,9 @@
       gameSize: 5,
       wrongResults: [],
       history: loadJson("tenpaiChanceHistory", []),
-      review: loadJson("tenpaiChanceReview", [])
+      review: loadJson("tenpaiChanceReview", []),
+      problemStats: loadJson("tenpaiChanceProblemStats", {}),
+      favorites: loadJson("tenpaiChanceFavorites", [])
     };
 
     function loadJson(key, fallback) {
@@ -509,6 +551,14 @@
       localStorage.setItem("tenpaiChanceReview", JSON.stringify(state.review.slice(-200)));
     }
 
+    function saveProblemStats() {
+      localStorage.setItem("tenpaiChanceProblemStats", JSON.stringify(state.problemStats));
+    }
+
+    function saveFavorites() {
+      localStorage.setItem("tenpaiChanceFavorites", JSON.stringify([...new Set(state.favorites)].slice(-200)));
+    }
+
     function shuffle(arr) {
       const a = [...arr];
       for (let i = a.length - 1; i > 0; i--) {
@@ -520,6 +570,10 @@
 
     function sample(arr, count) {
       return shuffle(arr).slice(0, Math.min(count, arr.length));
+    }
+
+    function htmlJson(value) {
+      return JSON.stringify(value).replaceAll('"', "&quot;");
     }
 
     function tileKey(tile) { return `${tile.suit}${tile.num}`; }
@@ -725,6 +779,11 @@
       return PROBLEMS.map((hand, index) => sourceProblem(hand, index + 1));
     }
 
+    function sourceProblemId(hand) {
+      const index = PROBLEMS.indexOf(hand);
+      return index >= 0 ? index + 1 : 0;
+    }
+
     function validSourceHands() {
       return sourceProblems().filter(p => !p.issues.length).map(p => p.hand);
     }
@@ -830,6 +889,31 @@
       return keys.map(tileLabelFromKey).join(" / ") || "-";
     }
 
+    function updateProblemStats(hand, ok) {
+      if (!hand) return;
+      const current = state.problemStats[hand] || { correct: 0, total: 0 };
+      state.problemStats[hand] = {
+        correct: current.correct + (ok ? 1 : 0),
+        total: current.total + 1
+      };
+      saveProblemStats();
+    }
+
+    function isFavorite(hand) {
+      return state.favorites.includes(hand);
+    }
+
+    function toggleFavorite(hand) {
+      if (!hand) return;
+      if (isFavorite(hand)) {
+        state.favorites = state.favorites.filter(item => item !== hand);
+      } else {
+        state.favorites = [...state.favorites, hand];
+      }
+      saveFavorites();
+      render();
+    }
+
     function acceptanceDetail(problem, discardKey) {
       const score = problem.scores?.find(item => item.discard === discardKey);
       if (!score) return `${tileLabelFromKey(discardKey)}: -`;
@@ -864,6 +948,7 @@
       const ok = sameSet(selectedAnswerKeys(), state.current.answers);
       state.checked = true;
       state.lastCorrect = ok;
+      updateProblemStats(state.current.sourceHand || state.current.hand, ok);
       if (ok) state.correct += 1;
       else {
         state.miss += 1;
@@ -924,16 +1009,40 @@
       return `<div class="mini-hand">${tiles.map(tile => renderTile(tile, { mini: true })).join("")}</div>`;
     }
 
+    function renderAccuracy(hand) {
+      const stats = state.problemStats[hand] || { correct: 0, total: 0 };
+      if (!stats.total) {
+        return `
+          <div class="accuracy">正答率 未挑戦</div>
+          <div class="accuracy-bar"><span style="width:0%"></span></div>
+        `;
+      }
+      const rate = Math.round((stats.correct / stats.total) * 100);
+      return `
+        <div class="accuracy">正答率 ${rate}%（${stats.correct}/${stats.total}）</div>
+        <div class="accuracy-bar"><span style="width:${rate}%"></span></div>
+      `;
+    }
+
+    function renderFavoriteButton(hand) {
+      const active = isFavorite(hand);
+      return `<button class="favorite-btn ${active ? "active" : ""}" type="button" onclick="toggleFavorite(${htmlJson(hand)})">${active ? "★済" : "☆追加"}</button>`;
+    }
+
     function renderProblemRow(p, extra = "") {
+      const handKey = p.sourceHand || p.hand;
       const answers = p.answers?.map(tileLabelFromKey).join(" / ") || "";
+      const no = sourceProblemId(handKey) || p.id || "-";
       return `
         <div class="problem-row">
-          <div>
+          <div class="problem-main">
             ${renderMiniHand(p.tiles)}
+            <div class="row-answer">No.${no} / 正解 ${answers}</div>
             ${extra ? `<div class="muted">${extra}</div>` : ""}
             ${p.issues?.length ? `<div class="muted">要確認: ${p.issues.join(" / ")}</div>` : ""}
+            ${renderAccuracy(handKey)}
           </div>
-          <div class="row-answer">${answers}</div>
+          ${renderFavoriteButton(handKey)}
         </div>
       `;
     }
@@ -1057,7 +1166,7 @@
           <section class="card">
             <div class="prompt">誤答問題</div>
             <div class="list">
-              ${state.wrongResults.map(w => renderProblemRow({ ...w, tiles: parseHand(w.hand) }, `選択 ${w.selected.map(tileLabelFromKey).join(" / ") || "-"}`)).join("")}
+              ${state.wrongResults.map(w => renderProblemRow({ ...w, id: sourceProblemId(w.sourceHand), tiles: parseHand(w.hand) }, `選択 ${w.selected.map(tileLabelFromKey).join(" / ") || "-"}`)).join("")}
             </div>
           </section>
         ` : ""}
@@ -1084,7 +1193,9 @@
 
     function renderReview() {
       const uniqueHands = [...new Set(state.review.map(item => item.sourceHand).filter(Boolean))];
-      const problems = uniqueHands.map((hand, index) => makeProblem(hand, index + 1, false));
+      const problems = uniqueHands.map((hand, index) => makeProblem(hand, sourceProblemId(hand) || index + 1, false));
+      const favoriteHands = [...new Set(state.favorites.filter(Boolean))];
+      const favoriteProblems = favoriteHands.map((hand, index) => makeProblem(hand, sourceProblemId(hand) || index + 1, false));
       return `
         ${renderTop("review")}
         <section class="card">
@@ -1101,6 +1212,21 @@
               ${problems.map(p => renderProblemRow(p)).join("")}
             </div>
           ` : `<div class="answer-panel">誤答問題はまだありません。</div>`}
+        </section>
+        <section class="card">
+          <div class="section-head">
+            <h2 class="section-title">お気に入り</h2>
+            <span class="muted">${favoriteHands.length}問</span>
+          </div>
+          ${favoriteHands.length ? `
+            <div class="actions">
+              <button class="btn practice-btn" onclick="startGame('review', 5, ${htmlJson(favoriteHands)})">5問</button>
+              <button class="btn practice-btn" onclick="startGame('review', 15, ${htmlJson(favoriteHands)})">15問</button>
+            </div>
+            <div class="list" style="margin-top:14px">
+              ${favoriteProblems.map(p => renderProblemRow(p)).join("")}
+            </div>
+          ` : `<div class="answer-panel">お気に入りはまだありません。</div>`}
         </section>
       `;
     }
